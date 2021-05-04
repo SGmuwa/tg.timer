@@ -9,6 +9,7 @@ import subprocess
 from pathlib import Path
 import os
 from loguru import logger
+from datetime import datetime
 
 from telethon.hints import EntityLike
 
@@ -42,7 +43,6 @@ with TelegramClient("check", get_api_id(), get_api_hash()) as client:
 
     async def send_to_future(user_id, bs: list[bytes]):
         logger.trace("send_to_future sleep")
-        await asyncio.sleep(0.8)
         l = b''.join(bs)
         bs.clear()
         logger.trace("Ready to send {} KiB", len(l) / 1024)
@@ -55,16 +55,18 @@ with TelegramClient("check", get_api_id(), get_api_hash()) as client:
         logger.debug("{} start read", user_id)
         bs = list()
         while not proc.stdout.closed:
-            logger.trace("{} Reading...", user_id)
+            logger.trace("{}", bs[0] if bs else None)
+            task = asyncio.get_event_loop().call_later(0.1, lambda: asyncio.get_running_loop().create_task(send_to_future(user_id, bs)))
             bs.append(
                 await asyncio.get_event_loop().run_in_executor(
                     None,
                     lambda: proc.stdout.read(1)
                 )
             )
-            logger.trace("{} Readed", user_id)
-            create_task(send_to_future(user_id, bs))
+            task.cancel()
+        await send_to_future(user_id, bs)
         logger.debug("{} end read", user_id)
+
     
     async def good_user_handler(event: telethon.events.newmessage.NewMessage.Event):
         message: telethon.tl.patched.Message = event.message
@@ -92,7 +94,12 @@ with TelegramClient("check", get_api_id(), get_api_hash()) as client:
             else:
                 logger.trace("Write data to checks.py...")
                 processes[user_id].stdin.write(message.message.encode() + b"\n")
-                processes[user_id].stdin.flush()
+                try:
+                    processes[user_id].stdin.flush()
+                except BrokenPipeError as e:
+                    processes[user_id].kill()
+                    del processes[user_id]
+                    await handler(event)
                 logger.trace("Write data ready.")
                 logger.debug("Return code: {}", processes[user_id].returncode)
 
@@ -101,7 +108,7 @@ with TelegramClient("check", get_api_id(), get_api_hash()) as client:
         try:
             message: telethon.tl.patched.Message = event.message
             user_id = message.peer_id.user_id
-            logger.info("{}: {}", user_id, message.message)
+            logger.info("got message {}: {}", user_id, message.message)
             if user_id in good_users:
                 await good_user_handler(event)
         except Exception as e:
