@@ -57,12 +57,13 @@ with TelegramClient("check", get_api_id(), get_api_hash()) as client:
         while not proc.stdout.closed:
             logger.trace("{}", bs[0] if bs else None)
             task = asyncio.get_event_loop().call_later(0.1, lambda: asyncio.get_running_loop().create_task(send_to_future(user_id, bs)))
-            bs.append(
-                await asyncio.get_event_loop().run_in_executor(
-                    None,
-                    lambda: proc.stdout.read(1)
-                )
+            to_append = await asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: proc.stdout.read(1)
             )
+            if not to_append:
+                break
+            bs.append(to_append)
             task.cancel()
         await send_to_future(user_id, bs)
         logger.debug("{} end read", user_id)

@@ -1,14 +1,9 @@
 #!/usr/bin/python3.9
 from datetime import datetime
-from enum import Enum
 from decimal import Decimal
 import decimal
-from dataclasses import dataclass, field
 from json import dumps
-from typing import Optional
 from math import trunc
-from time import sleep
-import sys
 
 categories: list[str] = ["Вкусняшки", "Долг", "Дорога", "Дорога дальняя", "Другое", "Заработная плата Стипендия Пособия Регулярные выплаты", "Здоровье", "Инвестиции", "Канцтовары", "Коммунальные услуги", "Коммуникация", "Подарок", "Продукты", "Развлечения", "Столовая и кафе и рестораны", "Учёт", "Хозяйство"]
 
@@ -372,8 +367,6 @@ def main():
 	else:
 		print("Отменено.")
 	print("Выход.")
-	sys.stdin.flush()
-	sleep(1)
 
 if __name__ == "__main__":
 	main()
