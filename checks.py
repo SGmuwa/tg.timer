@@ -7,6 +7,8 @@ from dataclasses import dataclass, field
 from json import dumps
 from typing import Optional
 from math import trunc
+from time import sleep
+import sys
 
 categories: list[str] = ["Вкусняшки", "Долг", "Дорога", "Дорога дальняя", "Другое", "Заработная плата Стипендия Пособия Регулярные выплаты", "Здоровье", "Инвестиции", "Канцтовары", "Коммунальные услуги", "Коммуникация", "Подарок", "Продукты", "Развлечения", "Столовая и кафе и рестораны", "Учёт", "Хозяйство"]
 
@@ -360,7 +362,18 @@ class Check:
 
 
 def main():
-	print(Check.io())
+	result = Check.io()
+	print(dumps(result.as_dict(), indent=1, ensure_ascii=False, default=str))
+	l = input("Сохранить? Напишите «да» для сохранения")
+	if l.lower() == "да":
+		with open("./saves.json.log", "a") as f:
+			f.write(str(result) + "\n")
+		print("Сохранено.")
+	else:
+		print("Отменено.")
+	print("Выход.")
+	sys.stdin.flush()
+	sleep(1)
 
 if __name__ == "__main__":
 	main()
