@@ -323,7 +323,7 @@ class Check:
 	
 	def actual_sum_io(self):
 		self.actual_sum = input(f"Сумма чека. Скорее всего ответ «{Decimal(trunc(self.calculate_actual_sum() * 100))/100}», однако это не всегда так. Посмотрите на чеке и запишите ответ:\n🧮 ")
-		print(f"Сумма чека: «{self.count}»")
+		print(f"Сумма чека: «{self.actual_sum}»")
 	
 	@classmethod
 	def io(cls):
