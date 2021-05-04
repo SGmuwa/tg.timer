@@ -359,7 +359,7 @@ class Check:
 def main():
 	result = Check.io()
 	print(dumps(result.as_dict(), indent=1, ensure_ascii=False, default=str))
-	l = input("Сохранить? Напишите «да» для сохранения")
+	l = input("Сохранить? Напишите «да» для сохранения\n💾 ")
 	if l.lower() == "да":
 		with open("./saves.json.log", "a") as f:
 			f.write(str(result) + "\n")
