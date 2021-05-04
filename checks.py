@@ -281,7 +281,7 @@ class Check:
 	
 	def products_add_all_io(self):
 		while True:
-			i = input("Добавить товар? «да» для добавления.\n🧺 ")
+			i = input("Добавить" + (" ещё один" if self._products else "") + " товар? «да» для добавления.\n🧺 ")
 			if i.lower() != "да":
 				break
 			self.products_add_io()
