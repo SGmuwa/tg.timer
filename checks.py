@@ -191,6 +191,7 @@ class Product:
 	def as_dict(self) -> dict:
 		return {
 			"name": self.name,
+			"category": self.category,
 			"price": self.price,
 			"count": self.count,
 			"actual_sum": self.actual_sum
