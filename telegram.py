@@ -1,4 +1,4 @@
-#!/usr/bin/env python3.9
+#!/usr/bin/env python3.8
 from asyncio.tasks import create_task
 from re import sub
 from telethon import TelegramClient, events
@@ -35,13 +35,13 @@ def get_good_users() -> list:
 good_users = get_good_users()
 
 
-processes: dict[int, subprocess.Popen] = dict()
+processes= dict()
 
 with TelegramClient("check", get_api_id(), get_api_hash()) as client:
     client: TelegramClient = client
     client.start(bot_token=get_bot_token())
 
-    async def send_to_future(user_id, bs: list[bytes]):
+    async def send_to_future(user_id, bs):
         logger.trace("send_to_future sleep")
         l = b''.join(bs)
         bs.clear()
@@ -74,7 +74,7 @@ with TelegramClient("check", get_api_id(), get_api_hash()) as client:
         user_id = message.peer_id.user_id
         if user_id not in processes:
             process = subprocess.Popen(
-                "./checks.py",
+                ["python3.8", "checks.py"],
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
