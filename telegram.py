@@ -41,14 +41,23 @@ with TelegramClient("check", get_api_id(), get_api_hash()) as client:
     client: TelegramClient = client
     client.start(bot_token=get_bot_token())
 
+    def split_str_by_length(s: str, chunk_limit: int):
+        return [s[i:i+chunk_limit] for i in range(0, len(s), chunk_limit) ]
+
     async def send_to_future(user_id, bs):
         logger.trace("send_to_future sleep")
         l = b''.join(bs)
         bs.clear()
         logger.trace("Ready to send {} KiB", len(l) / 1024)
         if l:
+            logger.trace(f"get message from bytes length {len(l)}")
+            msg = l.decode()
+            logger.trace(f"ready chars {len(msg)}")
+            msgs = split_str_by_length(msg, 4096)
+            logger.trace(f"splitted! count: {len(msgs)}")
             logger.trace("Sending...")
-            await client.send_message(user_id, l.decode())
+            for m in msgs:
+                await client.send_message(user_id, m)
             logger.trace("Sent.")
 
     async def reader_from_exec(user_id: int, proc: subprocess.Popen):
@@ -74,7 +83,7 @@ with TelegramClient("check", get_api_id(), get_api_hash()) as client:
         user_id = message.peer_id.user_id
         if user_id not in processes:
             process = subprocess.Popen(
-                ["python3.8", "checks.py"],
+                ["python3", "checks.py"],
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
