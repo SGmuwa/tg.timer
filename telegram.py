@@ -1,4 +1,4 @@
-#!/usr/bin/env python3.8
+#!/usr/bin/env python3
 from asyncio.tasks import create_task
 from re import sub
 from telethon import TelegramClient, events
