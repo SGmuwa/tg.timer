@@ -1,0 +1,3 @@
+[submodule "checks-data"]
+	path = checks-data
+	url = ../checks-data/
