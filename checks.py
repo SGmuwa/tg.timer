@@ -4,6 +4,8 @@ from decimal import Decimal
 import decimal
 from json import dumps
 from math import trunc
+from os import getenv
+from sys import argv
 
 categories= ["Вкусняшки", "Долг", "Дорога", "Дорога дальняя", "Другое", "Заработная плата Стипендия Пособия Регулярные выплаты", "Здоровье", "Инвестиции", "Канцтовары", "Коммунальные услуги", "Коммуникация", "Подарок", "Продукты", "Развлечения", "Столовая и кафе и рестораны", "Учёт", "Хозяйство"]
 
@@ -358,11 +360,12 @@ class Check:
 
 
 def main():
+	identificator = f"{argv[0]}." if len(argv) >= 1 else '';
 	result = Check.io()
 	print(dumps(result.as_dict(), indent=1, ensure_ascii=False, default=str))
 	l = input("Сохранить? Напишите «да» для сохранения\n💾 ")
 	if l.lower() == "да":
-		with open("./saves.json.log", "a") as f:
+		with open(os.getenv("OUTPUT_FOLDER", "./data/") + identificator + "json.log", "a") as f:
 			f.write(str(result) + "\n")
 		print("Сохранено.")
 	else:

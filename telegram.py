@@ -83,7 +83,7 @@ with TelegramClient("check", get_api_id(), get_api_hash()) as client:
         user_id = message.peer_id.user_id
         if user_id not in processes:
             process = subprocess.Popen(
-                ["python3", "checks.py"],
+                ["python3", "checks.py", str(user_id)],
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
