@@ -1,17 +1,9 @@
 #!/usr/bin/env python3
-from asyncio.tasks import create_task
-from re import sub
 from telethon import TelegramClient, events
 import telethon
 import asyncio
-from dataclasses import dataclass
 import subprocess
-from pathlib import Path
-import os
 from loguru import logger
-from datetime import datetime
-
-from telethon.hints import EntityLike
 
 
 def get_api_id() -> str:
