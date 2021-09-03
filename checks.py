@@ -360,7 +360,7 @@ class Check:
 
 
 def main():
-	identificator = f"{argv[0]}." if len(argv) >= 1 else '';
+	identificator = f"{argv[1]}." if len(argv) >= 2 else '';
 	result = Check.io()
 	print(dumps(result.as_dict(), indent=1, ensure_ascii=False, default=str))
 	l = input("Сохранить? Напишите «да» для сохранения\n💾 ")
