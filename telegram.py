@@ -5,6 +5,7 @@ import asyncio
 import subprocess
 from loguru import logger
 
+logger.trace("application started.")
 
 def get_api_id() -> str:
     with open("./api_id.secret", "r") as f:
@@ -29,9 +30,14 @@ good_users = get_good_users()
 
 processes= dict()
 
-with TelegramClient("check", get_api_id(), get_api_hash()) as client:
+logger.trace("Init TelegramClient...")
+with TelegramClient(
+        "check",
+        get_api_id(),
+        get_api_hash(),
+        base_logger=logger
+    ).start(bot_token=get_bot_token()) as client:
     client: TelegramClient = client
-    client.start(bot_token=get_bot_token())
 
     def split_str_by_length(s: str, chunk_limit: int):
         return [s[i:i+chunk_limit] for i in range(0, len(s), chunk_limit) ]
