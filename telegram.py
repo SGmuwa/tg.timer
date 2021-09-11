@@ -5,7 +5,7 @@ import asyncio
 import subprocess
 from loguru import logger
 from os import environ
-from json5 import load
+from json5 import load, loads
 
 logger.trace("application started.")
 
@@ -34,6 +34,10 @@ class Settings:
     @property
     def white_list(self) -> list:
         return self.json["white_list"]
+
+    @property
+    def execute_app(self) -> list:
+        return loads(environ.get("TELEGRAM_EXECUTE_APP", '["python3", "./checks/main.py"]'))
 
 
 settings = Settings()
@@ -92,7 +96,7 @@ with TelegramClient(
         user_id = message.peer_id.user_id
         if user_id not in processes:
             process = subprocess.Popen(
-                ["python3", "checks.py", str(user_id)],
+                settings.execute_app + [str(user_id)],
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
