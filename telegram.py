@@ -4,43 +4,53 @@ import telethon
 import asyncio
 import subprocess
 from loguru import logger
+from os import environ
+from json import load
 
 logger.trace("application started.")
 
-def get_api_id() -> str:
-    with open("./api_id.secret", "r") as f:
-        return f.read()
+
+class Settings:
+    def __init__(self, secret_path = environ.get("TELEGRAM_SECRET_PATH", "./secret.json")):
+        with open(secret_path) as f:
+            self.json = load(f)
+
+    @property
+    def session_path(self) -> str:
+        return self.json["session_path"]
+
+    @property
+    def api_id(self) -> int:
+        return self.json["api_id"]
+
+    @property
+    def api_hash(self) -> str:
+        return self.json["api_hash"]
+
+    @property
+    def bot_token(self) -> str:
+        return self.json["bot_token"]
+
+    @property
+    def white_list(self) -> list:
+        return self.json["white_list"]
 
 
-def get_api_hash() -> str:
-    with open("./api_hash.secret", "r") as f:
-        return f.read()
+settings = Settings()
 
-
-def get_bot_token() -> str:
-    with open("./api_bot_token.secret", "r") as f:
-        return f.read()
-
-
-def get_good_users() -> list:
-    with open("./good_users.secret", "r") as f:
-        return [int(i) for i in f.read().split()]
-good_users = get_good_users()
-
-
-processes= dict()
+processes = dict()
 
 logger.trace("Init TelegramClient...")
 with TelegramClient(
-        "check",
-        get_api_id(),
-        get_api_hash(),
-        base_logger=logger
-    ).start(bot_token=get_bot_token()) as client:
+    settings.session_path,
+    settings.api_id,
+    settings.api_hash,
+    base_logger=logger
+).start(bot_token=settings.bot_token) as client:
     client: TelegramClient = client
 
     def split_str_by_length(s: str, chunk_limit: int):
-        return [s[i:i+chunk_limit] for i in range(0, len(s), chunk_limit) ]
+        return [s[i:i+chunk_limit] for i in range(0, len(s), chunk_limit)]
 
     async def send_to_future(user_id, bs):
         logger.trace("send_to_future sleep")
@@ -63,7 +73,8 @@ with TelegramClient(
         bs = list()
         while not proc.stdout.closed:
             logger.trace("{}", bs[0] if bs else None)
-            task = asyncio.get_event_loop().call_later(0.1, lambda: asyncio.get_running_loop().create_task(send_to_future(user_id, bs)))
+            task = asyncio.get_event_loop().call_later(
+                0.1, lambda: asyncio.get_running_loop().create_task(send_to_future(user_id, bs)))
             to_append = await asyncio.get_event_loop().run_in_executor(
                 None,
                 lambda: proc.stdout.read(1)
@@ -75,7 +86,6 @@ with TelegramClient(
         await send_to_future(user_id, bs)
         logger.debug("{} end read", user_id)
 
-    
     async def good_user_handler(event: telethon.events.newmessage.NewMessage.Event):
         message: telethon.tl.patched.Message = event.message
         user_id = message.peer_id.user_id
@@ -101,7 +111,8 @@ with TelegramClient(
                 await handler(event)
             else:
                 logger.trace("Write data to checks.py...")
-                processes[user_id].stdin.write(message.message.encode() + b"\n")
+                processes[user_id].stdin.write(
+                    message.message.encode() + b"\n")
                 try:
                     processes[user_id].stdin.flush()
                 except BrokenPipeError as e:
@@ -117,7 +128,7 @@ with TelegramClient(
             message: telethon.tl.patched.Message = event.message
             user_id = message.peer_id.user_id
             logger.info("got message {}: {}", user_id, message.message)
-            if user_id in good_users:
+            if user_id in settings.white_list:
                 await good_user_handler(event)
         except Exception as e:
             logger.exception(e)
