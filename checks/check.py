@@ -138,11 +138,14 @@ class Check:
 	def actual_sum_io(self):
 		self.actual_sum = input(f"Сумма чека. Скорее всего ответ «{Decimal(trunc(self.calculate_actual_sum() * 100))/100}», однако это не всегда так. Посмотрите на чеке и запишите ответ:\n🧮 ")
 		print(f"Сумма чека: «{self.actual_sum}»")
+	
+	def version(self):
+		self.version = "v3"
 
 	@classmethod
 	def io(cls):
 		output = cls()
-		functions = [output.counterparty_io, output.date_io, output.currency_io, output.products_add_all_io, output.actual_sum_io]
+		functions = [output.counterparty_io, output.date_io, output.currency_io, output.products_add_all_io, output.actual_sum_io, output.version]
 		i = 0
 		while i < len(functions):
 			try:
