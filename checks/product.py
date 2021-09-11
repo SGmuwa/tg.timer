@@ -1,4 +1,3 @@
-#!/usr/bin/python3
 from decimal import Decimal
 import decimal
 from json import dumps
