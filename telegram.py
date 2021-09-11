@@ -37,7 +37,7 @@ class Settings:
 
     @property
     def execute_app(self) -> list:
-        return loads(environ.get("TELEGRAM_EXECUTE_APP", '["python3", "./checks/main.py"]'))
+        return loads(environ.get("TELEGRAM_EXECUTE_APP", '["python3", "./checks/__main__.py"]'))
 
 
 settings = Settings()

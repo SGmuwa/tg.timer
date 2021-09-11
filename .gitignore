@@ -2,3 +2,4 @@
 *.session
 *.log
 secret.*
+__pycache__
