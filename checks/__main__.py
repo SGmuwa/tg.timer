@@ -3,7 +3,10 @@ from json import dumps
 from os import getenv
 from sys import argv
 
-from check import Check
+try:
+	from . import Check
+except ImportError:
+	from check import Check
 
 currencies = ["₽", "€", "Aurum", "MTSS", "RU000A101CY8", "LNTA", "YNDX", "NASDAQ: ATVI"]
 

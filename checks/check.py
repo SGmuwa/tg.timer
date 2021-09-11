@@ -4,8 +4,12 @@ import decimal
 from json import dumps
 from math import trunc
 
-from counterparty import Counterparty
-from product import Product
+try:
+	from . import Counterparty
+	from . import Product
+except ImportError:
+	from counterparty import Counterparty
+	from product import Product
 
 currencies = ["₽", "€", "Aurum", "MTSS", "RU000A101CY8", "LNTA", "YNDX", "NASDAQ: ATVI"]
 
