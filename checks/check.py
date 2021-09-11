@@ -166,6 +166,7 @@ class Check:
 
 	def as_dict(self) -> dict:
 		return {
+			"version": self.version,
 			"date": self.date,
 			"products": [product.as_dict() for product in self.products],
 			"counterparty": self.counterparty.as_dict() if self.counterparty is not None else None,
