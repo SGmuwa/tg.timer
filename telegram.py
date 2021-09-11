@@ -5,13 +5,13 @@ import asyncio
 import subprocess
 from loguru import logger
 from os import environ
-from json import load
+from json5 import load
 
 logger.trace("application started.")
 
 
 class Settings:
-    def __init__(self, secret_path = environ.get("TELEGRAM_SECRET_PATH", "./secret.json")):
+    def __init__(self, secret_path = environ.get("TELEGRAM_SECRET_PATH", "./secret.json5")):
         with open(secret_path) as f:
             self.json = load(f)
 
@@ -48,6 +48,7 @@ with TelegramClient(
     base_logger=logger
 ).start(bot_token=settings.bot_token) as client:
     client: TelegramClient = client
+    logger.trace("Telegram client instance created")
 
     def split_str_by_length(s: str, chunk_limit: int):
         return [s[i:i+chunk_limit] for i in range(0, len(s), chunk_limit)]
