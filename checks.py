@@ -365,7 +365,7 @@ def main():
 	print(dumps(result.as_dict(), indent=1, ensure_ascii=False, default=str))
 	l = input("Сохранить? Напишите «да» для сохранения\n💾 ")
 	if l.lower() == "да":
-		with open(getenv("OUTPUT_FOLDER", "./data/") + identificator + "json.log", "a") as f:
+		with open(getenv("CHECKS_OUTPUT_FOLDER", "./data/") + identificator + "json.log", "a") as f:
 			f.write(str(result) + "\n")
 		print("Сохранено.")
 	else:
