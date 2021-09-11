@@ -8,8 +8,6 @@ try:
 except ImportError:
 	from check import Check
 
-currencies = ["₽", "€", "Aurum", "MTSS", "RU000A101CY8", "LNTA", "YNDX", "NASDAQ: ATVI"]
-
 def main():
 	identificator = f"{argv[1]}." if len(argv) >= 2 else '';
 	result = Check.io()
