@@ -152,11 +152,15 @@ class Check:
 				functions[i]()
 			except Exception as e:
 				print(output)
-				yes = input(f"В ходе выполнения «{functions[i]}» произошла ошибка «{e}». Вы можете повторить. Напишите «да» чтобы повторить.")
-				if yes == "да":
-					continue
-				else:
-					raise ValueError("Пользователь решил отменить заполнение.") from e
+				while True:
+					yes = input(f"В ходе выполнения «{functions[i]}» произошла ошибка «{e}». Вы можете повторить. Напишите «повторить» чтобы повторить. Напишите «не повторять» чтобы отменить.")
+					if yes == "повторить":
+						i -= 1
+						break
+					elif yes == "не повторять":
+						raise ValueError("Пользователь решил отменить заполнение.") from e
+					else:
+						continue
 			i += 1
 		return output
 
