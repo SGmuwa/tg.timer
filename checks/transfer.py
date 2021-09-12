@@ -13,7 +13,7 @@ class Transfer:
         for point in path:
             target[point] = {}
             target = target[point]
-        return target
+        self._target = target
 
     @staticmethod
     def concat_dicts(dict1: dict, dict2: dict) -> dict:
@@ -27,23 +27,34 @@ class Transfer:
                 output[k] = deepcopy(dict2[k])
         return output
 
-    @classmethod
-    def io(cls):
-        output = Transfer()
-        target = output.name_io()
+    def kind_io(self):
         kind = None
         while True:
             try:
                 kind = input("1. «difference». Тип трансфера является разницей (чаще всего).\n2. «set». Тип трансфера является отожествление значения счёта. Значение денег установится тем числом, которое вы введёте.\nВведите «1» или «2».\n")
                 kind = int(kind)
+                if kind != 1 and kind != 2:
+                    raise ValueError(f"{kind} выходит за рамки допустимых значений")
                 break
             except Exception as e:
                 print(f"Не получилось определить тип счёта. Вы ввели «{kind}». Требовалось число 1 или 2.\n")
-        # try:
-		# 	self._actual_sum = Decimal(actual_sum)
-		# except decimal.InvalidOperation as e:
-		# 	raise ValueError(f"Не получилось прочитать цену позиции в чеке. Пример правильного числа: «{Decimal('25.12')}»") from e
-        
+        self._target["kind"] = "difference" if 1 else "set"
 
-    def __dict__(self):
+    def value_io(self):
+        while True:
+            try:
+                self._target["value"] = Decimal(input("Введите значение числом\n"))
+                break
+            except decimal.InvalidOperation as e:
+                raise ValueError(f"Не получилось прочитать цену позиции в чеке. Пример правильного числа: «{Decimal('25.12')}»") from e
+
+    @classmethod
+    def io(cls):
+        output = Transfer()
+        output.name_io()
+        output.kind_io()
+        output.value_io()
+        return output
+
+    def as_dict(self):
         return self.json

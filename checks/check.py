@@ -3,11 +3,14 @@ from decimal import Decimal
 import decimal
 from json import dumps
 from math import trunc
+from copy import deepcopy
 
 try:
+	from . import Transfer
 	from . import Counterparty
 	from . import Product
 except ImportError:
+	from transfer import Transfer
 	from counterparty import Counterparty
 	from product import Product
 
@@ -23,6 +26,8 @@ class Check:
 		self._counterparty = None
 		self._currency = None
 		self._actual_sum = Decimal(0)
+		self.version()
+		self._transfers = list()
 
 	@property
 	def date(self) -> str:
@@ -67,7 +72,7 @@ class Check:
 		return [product for product in self._products]
 
 	def products_add(self, product: Product):
-		return self._products.append(product)
+		self._products.append(product)
 
 	def calculate_actual_sum(self) -> Decimal:
 		return sum([product.actual_sum for product in self.products])
@@ -142,6 +147,16 @@ class Check:
 	def version(self):
 		self.version = "v3"
 
+	@property
+	def transfers(self) -> dict:
+		return deepcopy(self._transfers)
+
+	def transfers_add(self, transfer: Transfer):
+		self._transfers = Transfer.concat_dicts(self._transfers, transfer)
+
+	def transfer_add_io(self):
+		transfers_add(Transfer.io())
+
 	@classmethod
 	def io(cls):
 		output = cls()
@@ -171,7 +186,8 @@ class Check:
 			"products": [product.as_dict() for product in self.products],
 			"counterparty": self.counterparty.as_dict() if self.counterparty is not None else None,
 			"currency": self.currency,
-			"actual_sum": self.actual_sum
+			"actual_sum": self.actual_sum,
+			"transfers": self.transfers
 		}
 
 	def __str__(self) -> str:
