@@ -26,7 +26,7 @@ class Check:
 		self._counterparty = None
 		self._currency = None
 		self._actual_sum = Decimal(0)
-		self.version()
+		self._version = "v3"
 		self._transfers = list()
 
 	@property
@@ -143,9 +143,6 @@ class Check:
 	def actual_sum_io(self):
 		self.actual_sum = input(f"Сумма чека. Скорее всего ответ «{Decimal(trunc(self.calculate_actual_sum() * 100))/100}», однако это не всегда так. Посмотрите на чеке и запишите ответ:\n🧮 ")
 		print(f"Сумма чека: «{self.actual_sum}»")
-	
-	def version(self):
-		self.version = "v3"
 
 	@property
 	def transfers(self) -> dict:
@@ -160,7 +157,7 @@ class Check:
 	@classmethod
 	def io(cls):
 		output = cls()
-		functions = [output.counterparty_io, output.date_io, output.currency_io, output.products_add_all_io, output.actual_sum_io, output.version]
+		functions = [output.counterparty_io, output.date_io, output.currency_io, output.products_add_all_io, output.actual_sum_io]
 		i = 0
 		while i < len(functions):
 			try:
@@ -181,7 +178,7 @@ class Check:
 
 	def as_dict(self) -> dict:
 		return {
-			"version": self.version,
+			"version": self._version,
 			"date": self.date,
 			"products": [product.as_dict() for product in self.products],
 			"counterparty": self.counterparty.as_dict() if self.counterparty is not None else None,
