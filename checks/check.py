@@ -27,7 +27,7 @@ class Check:
 		self._currency = None
 		self._actual_sum = Decimal(0)
 		self._version = "v3"
-		self._transfers = list()
+		self._transfers = dict()
 
 	@property
 	def date(self) -> str:
@@ -149,15 +149,15 @@ class Check:
 		return deepcopy(self._transfers)
 
 	def transfers_add(self, transfer: Transfer):
-		self._transfers = Transfer.concat_dicts(self._transfers, transfer)
+		self._transfers = Transfer.concat_dicts(self._transfers, transfer.as_dict())
 
 	def transfer_add_io(self):
-		transfers_add(Transfer.io())
+		self.transfers_add(Transfer.io())
 
 	@classmethod
 	def io(cls):
 		output = cls()
-		functions = [output.counterparty_io, output.date_io, output.currency_io, output.products_add_all_io, output.actual_sum_io]
+		functions = [output.counterparty_io, output.date_io, output.currency_io, output.products_add_all_io, output.actual_sum_io, output.transfer_add_io]
 		i = 0
 		while i < len(functions):
 			try:
@@ -165,7 +165,7 @@ class Check:
 			except Exception as e:
 				print(output)
 				while True:
-					yes = input(f"В ходе выполнения «{functions[i]}» произошла ошибка «{e}». Вы можете повторить. Напишите «повторить» чтобы повторить. Напишите «не повторять» чтобы отменить.")
+					yes = input(f"В ходе выполнения «{functions[i]}» произошла ошибка «{e}». Вы можете повторить. Напишите «повторить» чтобы повторить. Напишите «не повторять» чтобы отменить.\n")
 					if yes == "повторить":
 						i -= 1
 						break
