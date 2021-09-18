@@ -64,18 +64,35 @@ class Counterparty:
 		self.name = input("Название организации или ИОФ человека если ФЛ:\n🕴 ")
 		print(f"Имя контрагента: «{self.name}»")
 
+	@property
+	def nickname(self) -> str:
+		return self._nickname
+
+	@nickname.setter
+	def nickname(self, nickname: str):
+		if type(nickname) != str:
+			raise ValueError(f"Кличка должна быть строкой. «{nickname}» ({type(nickname)})")
+		if nickname == "":
+			raise ValueError(f"Кличка не может быть пустым")
+		self._nickname = nickname
+
+	def nickname_io(self):
+		self.nickname = input("Кличка организации или человека:\n🕶 ")
+		print(f"Имя контрагента: «{self.nickname}»")
+
 	@classmethod
 	def io(cls) -> "Counterparty":
 		output = cls()
 		print("Заполнение контрагента.")
-		output.location_io()
+		output.nickname_io()
 		output.typeo_io()
 		output.name_io()
+		output.location_io()
 		print(f"Контрагент: {output}")
 		return output
 
 	def as_dict(self) -> dict:
-		return {"location": self.location, "typeo": self.typeo, "name": self.name}
+		return {"location": self.location, "typeo": self.typeo, "name": self.name, "nickname": self.nickname}
 
 	def __str__(self):
 		return dumps(self.as_dict(), ensure_ascii=False)
