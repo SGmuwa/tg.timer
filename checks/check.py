@@ -154,10 +154,17 @@ class Check:
 	def transfer_add_io(self):
 		self.transfers_add(Transfer.io())
 
+	def transfers_add_io(self):
+		while True:
+			i = input("Добавить" + (" ещё один" if self._products else "") + " транфер? «да» для добавления.\n🕵️ ")
+			if i.lower() != "да":
+				break
+			self.transfer_add_io()
+
 	@classmethod
 	def io(cls):
 		output = cls()
-		functions = [output.counterparty_io, output.date_io, output.currency_io, output.products_add_all_io, output.actual_sum_io, output.transfer_add_io]
+		functions = [output.counterparty_io, output.date_io, output.currency_io, output.products_add_all_io, output.actual_sum_io, output.transfers_add_io]
 		i = 0
 		while i < len(functions):
 			try:
