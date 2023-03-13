@@ -81,18 +81,20 @@ with TelegramClient(
     async def send_to_future(peer_id, msg, **kwargs):
         logger.trace("send_to_future sleep")
         logger.trace("Ready to send {} KiB", len(msg) / 1024)
+        sendent = []
         if msg:
             logger.trace(f"ready chars {len(msg)}")
             msgs = split_str_by_length(msg, 4096)
             logger.trace(f"splitted! count: {len(msgs)}")
             logger.trace("Sending...")
             for m in msgs:
-                await client.send_message(peer_id, m, **kwargs)
+                sendent.append(await client.send_message(peer_id, m, **kwargs))
             logger.trace("Sent.")
+        logger.trace("sendent: {sendent}", sendent=sendent)
+        return sendent
     
-    async def getLinkOfMessage(event: telethon.events.newmessage.NewMessage.Event):
-        message: telethon.tl.patched.Message = event.message
-        chat: telethon.types.Chat = await event.get_chat()
+    async def getLinkOfMessage(message: telethon.tl.patched.Message):
+        chat: telethon.types.Chat = await message.get_chat()
         if chat.username:
             return f"https://t.me/{chat.username}/{message.id}"
         else:
@@ -101,8 +103,19 @@ with TelegramClient(
     async def buildAlertCallText(event: telethon.events.newmessage.NewMessage.Event):
         message: telethon.tl.patched.Message = event.message
         callText = re.sub(r"^/alert@ktpizzaechobot\s*", "", message.text)
-        link = await getLinkOfMessage(event)
-        output = f"На кухню зовёт @{(await message.get_sender()).username} в чате {link}"
+        link = await getLinkOfMessage(message)
+        sender: telethon.types.User = await message.get_sender()
+        logger.trace("sender: {sender}", sender=sender)
+        output = f"На кухню зовёт "
+        if sender.username and sender.first_name:
+            output += f"{sender.first_name} @{(sender.username)}"
+        elif sender.username:
+            output += f"@{sender.username}"
+        elif sender.first_name:
+            output += sender.first_name
+        else:
+            output += f"аноним с id={sender.id}"
+        output += f" в чате {link}"
         if callText:
             output += f": «{callText}»"
         return output
@@ -114,15 +127,32 @@ with TelegramClient(
             logger.warning(f"Sender is bot! Skip: {message.text}")
             return
         elif not message.text.startswith("/alert@ktpizzaechobot"):
-            raise Exception("Только команда «/alert@ktpizzaechobot» поддерживается из бесед.")
+            logger.warning("Только команда «/alert@ktpizzaechobot» поддерживается из бесед. {event}", event=event)
+            await send_to_future(
+                message.peer_id,
+                "Только команда «/alert@ktpizzaechobot» поддерживается из бесед.",
+                reply_to=event.message
+            )
         elif lastSend is not None and datetime.now() < lastSend + timedelta(minutes=30):
-            raise Exception(f"Слишком часто отправляете, подождите {lastSend + timedelta(minutes=30) - datetime.now()}.")
+            logger.warning("Слишком частые оповещения {event}", event=event)
+            await send_to_future(
+                message.peer_id,
+                f"Слишком частые оповещения, нужно подождать {lastSend + timedelta(minutes=30) - datetime.now()}",
+                reply_to=event.message
+            )
         else:
             lastSend = datetime.now()
-            await send_to_future(
+            sendent = await send_to_future(
                 telethon.types.PeerChannel(settings.target_chat),
                 await buildAlertCallText(event)
             )
+            if sendent:
+                link = await getLinkOfMessage(sendent[0])
+                await send_to_future(
+                    message.peer_id,
+                    f"Зов создан: {link}",
+                    reply_to=event.message
+                )
 
     @client.on(events.NewMessage())
     async def handler(event: telethon.events.newmessage.NewMessage.Event):
