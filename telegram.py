@@ -46,18 +46,32 @@ class Settings:
             except Exception as e:
                 logger.warning("Can't remove secret file, error: «{}»", e)
         self._bot_user_id = re.sub(r":.*", "", self.json["bot_token"])
+        self._is_session_and_auth_key_configurated = None
 
     @property
     def session_and_auth_key(self) -> str:
-        return self.json.pop("session_and_auth_key")
+        output = self.json.pop("session_and_auth_key", None)
+        if self._is_session_and_auth_key_configurated is None:
+            if output:
+                self._is_session_and_auth_key_configurated = True
+            else:
+                self._is_session_and_auth_key_configurated = False
+        return output
+
+    @property
+    def is_session_and_auth_key_configurated(self) -> str:
+        if self._is_session_and_auth_key_configurated is None:
+            return "session_and_auth_key" in self.json
+        else:
+            return self._is_session_and_auth_key_configurated
 
     @property
     def api_id(self) -> int:
-        return self.json.pop("api_id")
+        return self.json.pop("api_id", 1)
 
     @property
     def api_hash(self) -> str:
-        return self.json.pop("api_hash")
+        return self.json.pop("api_hash", "0")
 
     @property
     def bot_token(self) -> str:
@@ -85,7 +99,8 @@ with TelegramClient(
 ).start(bot_token=settings.bot_token) as client:
     client: TelegramClient = client
     logger.trace("Telegram client instance created")
-    # logger.info(f"session: «{client.session.save()}»")
+    if not settings.is_session_and_auth_key_configurated:
+        raise Exception(f"Use session, instead of api_id and api_hash. Set session_and_auth_key to value: «{client.session.save()}»")
 
     def split_str_by_length(s: str, chunk_limit: int):
         return [s[i:i+chunk_limit] for i in range(0, len(s), chunk_limit)]
