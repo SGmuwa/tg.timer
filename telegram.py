@@ -131,27 +131,31 @@ with TelegramClient(
             await send_to_future(
                 message.peer_id,
                 "Только команда «/alert@ktpizzaechobot» поддерживается из бесед.",
-                reply_to=event.message
+                reply_to=event.message,
+                link_preview=False
             )
-        elif lastSend is not None and datetime.now() < lastSend + timedelta(minutes=30):
+        elif lastSend is not None and datetime.now() < lastSend + timedelta(minutes=90):
             logger.warning("Слишком частые оповещения {event}", event=event)
             await send_to_future(
                 message.peer_id,
                 f"Слишком частые оповещения, нужно подождать {lastSend + timedelta(minutes=30) - datetime.now()}",
-                reply_to=event.message
+                reply_to=event.message,
+                link_preview=False
             )
         else:
             lastSend = datetime.now()
             sendent = await send_to_future(
                 telethon.types.PeerChannel(settings.target_chat),
-                await buildAlertCallText(event)
+                await buildAlertCallText(event),
+                link_preview=False
             )
             if sendent:
                 link = await getLinkOfMessage(sendent[0])
                 await send_to_future(
                     message.peer_id,
                     f"Зов создан: {link}",
-                    reply_to=event.message
+                    reply_to=event.message,
+                    link_preview=False
                 )
 
     @client.on(events.NewMessage())
@@ -162,7 +166,11 @@ with TelegramClient(
             await alert(event)
         except Exception as e:
             logger.exception(e)
-            await send_to_future(message.peer_id, str(e), reply_to=event.message)
-
+            await send_to_future(
+                message.peer_id,
+                str(e),
+                reply_to=event.message,
+                link_preview=False
+            )
     logger.info("Telegram ready")
     client.run_until_disconnected()
