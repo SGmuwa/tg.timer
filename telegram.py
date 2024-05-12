@@ -10,6 +10,7 @@ except ModuleNotFoundError:
     install("telethon")
     from telethon import TelegramClient, events
 import telethon
+from telethon.sessions import StringSession
 from datetime import datetime, timedelta
 try:
     from loguru import logger
@@ -28,15 +29,27 @@ logger.trace("application started.")
 
 
 class Settings:
-    def __init__(self, secret_path = environ.get("TELEGRAM_SECRET_PATH", "./secret.json5")):
-        with open(secret_path) as f:
-            self.json = load(f)
+    def __init__(
+        self,
+        secret_path = environ.get("TELEGRAM_SECRET_PATH", "./secret.json5"),
+        content = environ.get("TELEGRAM_SECRET", None)
+    ):
+        if content:
+            logger.debug("use secret environment")
+            self.json = loads(content)
+        else:
+            logger.debug("use secret file")
+            with open(secret_path) as f:
+                self.json = load(f)
+            try:
+                remove(secret_path)
+            except Exception as e:
+                logger.warning("Can't remove secret file, error: «{}»", e)
         self._bot_user_id = re.sub(r":.*", "", self.json["bot_token"])
-        # remove(secret_path)
 
     @property
-    def session_path(self) -> str:
-        return self.json.pop("session_path")
+    def session_and_auth_key(self) -> str:
+        return self.json.pop("session_and_auth_key")
 
     @property
     def api_id(self) -> int:
@@ -61,19 +74,18 @@ class Settings:
 
 settings = Settings()
 
-processes = dict()
-
 lastSend = None
 
 logger.trace("Init TelegramClient...")
 with TelegramClient(
-    settings.session_path,
+    StringSession(settings.session_and_auth_key),
     settings.api_id,
     settings.api_hash,
     base_logger=logger
 ).start(bot_token=settings.bot_token) as client:
     client: TelegramClient = client
     logger.trace("Telegram client instance created")
+    # logger.info(f"session: «{client.session.save()}»")
 
     def split_str_by_length(s: str, chunk_limit: int):
         return [s[i:i+chunk_limit] for i in range(0, len(s), chunk_limit)]
