@@ -27,6 +27,7 @@ except ModuleNotFoundError:
 
 logger.trace("application started.")
 
+NEED_TO_WAIT_S = int(environ.get("NEED_TO_WAIT_S", "5400"))
 
 class Settings:
     def __init__(
@@ -154,18 +155,12 @@ with TelegramClient(
             logger.warning(f"Sender is bot! Skip: {message.text}")
             return
         elif not message.text.startswith("/alert@ktpizzaechobot"):
-            logger.warning("Только команда «/alert@ktpizzaechobot» поддерживается из бесед. {event}", event=event)
-            await send_to_future(
-                message.peer_id,
-                "Только команда «/alert@ktpizzaechobot» поддерживается из бесед.",
-                reply_to=event.message,
-                link_preview=False
-            )
-        elif lastSend is not None and datetime.now() < lastSend + timedelta(minutes=90):
+            logger.debug("Только команда «/alert@ktpizzaechobot» поддерживается из бесед. {event}", event=event)
+        elif lastSend is not None and datetime.now() < lastSend + timedelta(seconds=NEED_TO_WAIT_S):
             logger.warning("Слишком частые оповещения {event}", event=event)
             await send_to_future(
                 message.peer_id,
-                f"Слишком частые оповещения, нужно подождать {lastSend + timedelta(minutes=30) - datetime.now()}",
+                f"Слишком частые оповещения, нужно подождать {lastSend + timedelta(seconds=NEED_TO_WAIT_S) - datetime.now()}",
                 reply_to=event.message,
                 link_preview=False
             )
