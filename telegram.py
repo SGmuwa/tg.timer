@@ -156,7 +156,7 @@ with TelegramClient(
             return
         elif not message.text.startswith("/alert@ktpizzaechobot"):
             logger.debug("Только команда «/alert@ktpizzaechobot» поддерживается из бесед. {event}", event=event)
-        elif message.text == "/alert@ktpizzaechobot":
+        elif not message.text.startswith("/alert@ktpizzaechobot "):
             logger.warning("Для вызова всех на кухню необходимо написать команду-приглашение, пробел, пригласительный текст. {event}", event=event)
             await send_to_future(
                 message.peer_id,
