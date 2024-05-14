@@ -156,6 +156,14 @@ with TelegramClient(
             return
         elif not message.text.startswith("/alert@ktpizzaechobot"):
             logger.debug("Только команда «/alert@ktpizzaechobot» поддерживается из бесед. {event}", event=event)
+        elif message.text == "/alert@ktpizzaechobot":
+            logger.warning("Для вызова всех на кухню необходимо написать команду-приглашение, пробел, пригласительный текст. {event}", event=event)
+            await send_to_future(
+                message.peer_id,
+                f"Для вызова всех на кухню необходимо написать команду-приглашение, пробел, пригласительный текст. Команды-приглашения без пригласительного текста отключены.",
+                reply_to=event.message,
+                link_preview=False
+            )
         elif lastSend is not None and datetime.now() < lastSend + timedelta(seconds=NEED_TO_WAIT_S):
             logger.warning("Слишком частые оповещения {event}", event=event)
             await send_to_future(
