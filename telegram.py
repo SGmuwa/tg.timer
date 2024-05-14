@@ -1,29 +1,13 @@
 #!/usr/bin/env python3
 
-def install(package: str):
-    import pip
-    pip.main(["install", package])
-
-try:
-    from telethon import TelegramClient, events
-except ModuleNotFoundError:
-    install("telethon")
-    from telethon import TelegramClient, events
+from telethon import TelegramClient, events
 import telethon
 from telethon.sessions import StringSession
 from datetime import datetime, timedelta
-try:
-    from loguru import logger
-except ModuleNotFoundError:
-    install("loguru")
-    from loguru import logger
+from loguru import logger
 from os import environ, remove
 import re
-try:
-    from json5 import load, loads
-except ModuleNotFoundError:
-    install("json5")
-    from json5 import load, loads
+from json5 import load, loads
 
 logger.trace("application started.")
 
