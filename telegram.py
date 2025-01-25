@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+from asyncio import sleep
 from telethon import TelegramClient, events
 import telethon
 from telethon.sessions import StringSession
@@ -87,11 +88,19 @@ with TelegramClient(
     if not settings.is_session_and_auth_key_configurated:
         raise Exception(f"Use session, instead of api_id and api_hash. Set session_and_auth_key to value: «{client.session.save()}»")
 
+    username = ""
+
+    async def get_username():
+        global username
+        if not username:
+            username = (await client.get_me()).username
+        return username
+
     def split_str_by_length(s: str, chunk_limit: int):
         return [s[i:i+chunk_limit] for i in range(0, len(s), chunk_limit)]
 
-    async def send_to_future(peer_id, msg, **kwargs):
-        logger.trace("send_to_future sleep")
+    async def send_to_future(peer_id, msg, **kwargs) -> list[telethon.types.Message]:
+        logger.trace("send_to_future: begin")
         logger.trace("Ready to send {} KiB", len(msg) / 1024)
         sendent = []
         if msg:
@@ -114,7 +123,7 @@ with TelegramClient(
         
     async def buildAlertCallText(event: telethon.events.newmessage.NewMessage.Event):
         message: telethon.tl.patched.Message = event.message
-        callText = re.sub(r"^/alert@ktpizzaechobot\s*", "", message.text)
+        callText = re.sub(rf"^/alert@{await get_username()}\s*", "", message.text)
         link = await getLinkOfMessage(message)
         sender: telethon.types.User = await message.get_sender()
         logger.trace("sender: {sender}", sender=sender)
@@ -135,24 +144,25 @@ with TelegramClient(
     async def alert(event: telethon.events.newmessage.NewMessage.Event):
         global lastSend
         message: telethon.tl.patched.Message = event.message
+        to_delete = []
         if message.sender_id == settings.bot_user_id:
             logger.warning(f"Sender is bot! Skip: {message.text}")
             return
-        elif not message.text.startswith("/alert@ktpizzaechobot"):
-            logger.debug("Только команда «/alert@ktpizzaechobot» поддерживается из бесед. {event}", event=event)
-        elif not message.text.startswith("/alert@ktpizzaechobot "):
+        elif not message.text.startswith(f"/alert@{await get_username()}"):
+            logger.debug(f"Только команда «/alert@{await get_username()}» поддерживается из бесед. {event}", event=event)
+        elif not message.text.startswith(f"/alert@{await get_username()} "):
             logger.warning("Для вызова всех на кухню необходимо написать команду-приглашение, пробел, пригласительный текст. {event}", event=event)
-            await send_to_future(
+            to_delete = await send_to_future(
                 message.peer_id,
-                f"Для вызова всех на кухню необходимо написать команду-приглашение, пробел, пригласительный текст. Команды-приглашения без пригласительного текста отключены.",
+                f"❌ Для вызова всех на кухню необходимо написать:\n\n1. Команду-приглашение\n2. Пробел\n3. Пригласительный текст\n\nПример:\n\n`/alert@{await get_username()} Приходите на кухню есть пиццу 🍕 в честь моего Дня Рождения! 🎂🥳🎉`\n\nКоманды-приглашения без пригласительного текста отключены.",
                 reply_to=event.message,
                 link_preview=False
             )
         elif lastSend is not None and datetime.now() < lastSend + timedelta(seconds=NEED_TO_WAIT_S):
             logger.warning("Слишком частые оповещения {event}", event=event)
-            await send_to_future(
+            to_delete = await send_to_future(
                 message.peer_id,
-                f"Слишком частые оповещения, нужно подождать {lastSend + timedelta(seconds=NEED_TO_WAIT_S) - datetime.now()}",
+                f"⏳ Слишком частые оповещения, нужно подождать {lastSend + timedelta(seconds=NEED_TO_WAIT_S) - datetime.now()}",
                 reply_to=event.message,
                 link_preview=False
             )
@@ -167,10 +177,13 @@ with TelegramClient(
                 link = await getLinkOfMessage(sendent[0])
                 await send_to_future(
                     message.peer_id,
-                    f"Зов создан: {link}",
+                    f"✅ Зов создан: {link}",
                     reply_to=event.message,
                     link_preview=False
                 )
+        if to_delete:
+            await sleep(60)
+            await client.delete_messages(entity=event.chat_id, message_ids=to_delete)
 
     @client.on(events.NewMessage())
     async def handler(event: telethon.events.newmessage.NewMessage.Event):

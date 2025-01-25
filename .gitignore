@@ -1,6 +1,5 @@
-*.secret
 *.session
 *.log
-secret.*
+*secret*
 __pycache__
 data
