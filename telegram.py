@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import asyncio
 from asyncio import sleep
 from telethon import TelegramClient, events
 import telethon
@@ -10,6 +11,8 @@ from os import environ, remove
 import re
 from json5 import load, loads
 from dateutil import parser
+import signal
+from collections import deque
 
 logger.trace("application started.")
 
@@ -17,6 +20,8 @@ NEED_TO_WAIT_S = int(environ.get("NEED_TO_WAIT_S", "5400"))
 
 searcher_datetime = re.compile(r"\b(?:(?:[iI]\s?think\s?at\s?)|(?:[яЯ]\s?думаю\s?в\s?))(\d{4}-\d{2}-\d{2}(?:T|\s)(?:\d{1,2}):(?:\d{1,2})(?::(?:\d{1,2})(?:\.\d{1,6})?)?(?:\s?[+-]\d{2}:\d{2}|Z))\b")
 searcher_delta = re.compile(r" \((?:⏳|⌛️) \-?(?:\d+ days, )?\d{1,2}(?::\d{1,2}(?::\d{1,2})?)?\)")
+
+need_stop = False
 
 class Settings:
     def __init__(
@@ -127,43 +132,65 @@ with TelegramClient(
     
     messages = {}
     
+    queue: deque[telethon.types.Message] = deque()
+    
+    scheduler_is_running = False
+    
+    async def scheduler():
+        global scheduler_is_running
+        scheduler_is_running = True
+        global need_stop
+        while not need_stop:
+            try:
+                try:
+                    msg = queue.popleft()
+                except IndexError:
+                    scheduler_is_running = False
+                    break
+                msg_new = await consume(msg)
+                del messages[msg.id]
+                if msg_new:
+                    messages[msg_new.id] = msg_new
+                    queue.append(msg_new)
+            except Exception as e:
+                logger.exception(e)
+            await sleep(1)
+    
+    async def consume(message: telethon.types.Message) -> telethon.types.Message:
+        message: telethon.types.Message = messages[message.id]
+        found = searcher_datetime.search(message.message).group(1)
+        parsed = parser.parse(found)
+        try:
+            old_str = searcher_delta.search(message.message).group(0)
+        except AttributeError:
+            old_str = found
+        n = datetime.now().astimezone()
+        if parsed - n < timedelta(minutes=-10):
+            if old_str != found:
+                await message.edit(message.message.replace(old_str, "", 1))
+            return
+        new_str = f"{found if old_str == found else ''} ({'⏳' if parsed > n else '⌛️'} {format_timedelta(parsed - n)})"
+        logger.debug("new_str: {}", new_str)
+        message = await message.edit(message.message.replace(old_str, new_str, 1))
+        messages[message.id] = message
+        return message
+    
     async def alert(event: telethon.events.newmessage.NewMessage.Event):
         message: telethon.tl.patched.Message = event.message
         if not (await client.get_me()).is_self:
             logger.debug(f"Sender is not me! Skip: {message.text}")
             return
         found = searcher_datetime.search(message.message)
-        logger.info(found)
+        logger.debug(found)
         if not found:
             return
         found = found.groups()[0]
         parsed = parser.parse(found)
         n = datetime.now().astimezone()
-        old_str = found
-        new_str = f"{found} (⏳ {format_timedelta(parsed - n)})"
-        while parsed - n > timedelta(minutes=-10):
-            logger.debug("in while...")
-            message = await message.edit(message.message.replace(old_str, new_str, 1))
-            messages[message.id] = message
-            await sleep(5)
-            message: telethon.types.Message = messages[message.id]
-            try:
-                found = searcher_datetime.search(message.message).group(1)
-                parsed = parser.parse(found)
-            except Exception as e:
-                logger.exception(e)
-                break
-            try:
-                old_str = searcher_delta.search(message.message).group(0)
-            except IndexError as e:
-                logger.exception(e)
-                break
-            n = datetime.now().astimezone()
-            new_str = f" ({'⏳' if parsed > n else '⌛️'} {format_timedelta(parsed - n)})"
-            logger.debug("new_str: {}", new_str)
-        else:
-            if old_str != found:
-                await message.edit(message.message.replace(old_str, "", 1))
+        if parsed - n > timedelta(minutes=-10):
+            queue.append(message)
+            if not scheduler_is_running:
+                await scheduler()
 
     @client.on(events.NewMessage())
     async def handler_new(event: telethon.events.newmessage.NewMessage.Event):
@@ -180,13 +207,26 @@ with TelegramClient(
                 reply_to=event.message,
                 link_preview=False
             )
-        finally:
-            del messages[message.id]
     
     @client.on(events.MessageEdited())
     async def handler_edit(event: telethon.events.messageedited.MessageEdited.Event):
         if event.message.id in messages:
             messages[event.message.id] = event.message
     
+    async def handler_signal():
+        global need_stop
+        if need_stop:
+            exit(1)
+        need_stop=True
+        await client.disconnect()
+    
+    signal.signal(signal.SIGINT, handler_signal)
+    signal.signal(signal.SIGINT, handler_signal)
     logger.info("Telegram ready")
+    loop = client.loop
+    for signame in ('SIGINT', 'SIGTERM'):
+        loop.add_signal_handler(getattr(signal, signame),
+                                lambda: asyncio.create_task(handler_signal()))
     client.run_until_disconnected()
+
+need_stop = True
