@@ -16,7 +16,7 @@ from collections import deque
 
 logger.trace("application started.")
 
-NEED_TO_WAIT_S = int(environ.get("NEED_TO_WAIT_S", "5400"))
+MAX_WAIT_S = int(environ.get("MAX_WAIT_S", "5400"))
 
 searcher_datetime = re.compile(r"\b(?:(?:[iI]\s?think\s?at\s?)|(?:[яЯ]\s?думаю\s?в\s?))(\d{4}-\d{2}-\d{2}(?:T|\s)(?:\d{1,2}):(?:\d{1,2})(?::(?:\d{1,2})(?:\.\d{1,6})?)?(?:\s?[+-]\d{2}:\d{2}|Z))\b")
 searcher_delta = re.compile(r" \((?:⏳|⌛️) \-?(?:\d+ days, )?\d{1,2}(?::\d{1,2}(?::\d{1,2})?)?\)")
@@ -165,7 +165,7 @@ with TelegramClient(
         except AttributeError:
             old_str = found
         n = datetime.now().astimezone()
-        if parsed - n < timedelta(minutes=-10):
+        if parsed - n < timedelta(seconds=-MAX_WAIT_S):
             if old_str != found:
                 await message.edit(message.message.replace(old_str, "", 1))
             return
