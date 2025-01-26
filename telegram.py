@@ -9,10 +9,14 @@ from loguru import logger
 from os import environ, remove
 import re
 from json5 import load, loads
+from dateutil import parser
 
 logger.trace("application started.")
 
 NEED_TO_WAIT_S = int(environ.get("NEED_TO_WAIT_S", "5400"))
+
+searcher_datetime = re.compile(r"\b(?:(?:[iI]\s?think\s?at\s?)|(?:[яЯ]\s?думаю\s?в\s?))(\d{4}-\d{2}-\d{2}(?:T|\s)(?:\d{1,2}):(?:\d{1,2})(?::(?:\d{1,2})(?:\.\d{1,6})?)?(?:\s?[+-]\d{2}:\d{2}|Z))\b")
+searcher_delta = re.compile(r" \((?:⏳|⌛️) \-?(?:\d+ days, )?\d{1,2}(?::\d{1,2}(?::\d{1,2})?)?\)")
 
 class Settings:
     def __init__(
@@ -31,7 +35,6 @@ class Settings:
                 remove(secret_path)
             except Exception as e:
                 logger.warning("Can't remove secret file, error: «{}»", e)
-        self._bot_user_id = re.sub(r":.*", "", self.json["bot_token"])
         self._is_session_and_auth_key_configurated = None
 
     @property
@@ -59,22 +62,8 @@ class Settings:
     def api_hash(self) -> str:
         return self.json.pop("api_hash", "0")
 
-    @property
-    def bot_token(self) -> str:
-        return self.json.pop("bot_token")
-
-    @property
-    def target_chat(self) -> int:
-        return self.json["target_chat"]
-    
-    @property
-    def bot_user_id(self):
-        return self._bot_user_id
-
 
 settings = Settings()
-
-lastSend = None
 
 logger.trace("Init TelegramClient...")
 with TelegramClient(
@@ -82,7 +71,7 @@ with TelegramClient(
     settings.api_id,
     settings.api_hash,
     base_logger=logger
-).start(bot_token=settings.bot_token) as client:
+) as client:
     client: TelegramClient = client
     logger.trace("Telegram client instance created")
     if not settings.is_session_and_auth_key_configurated:
@@ -120,76 +109,68 @@ with TelegramClient(
             return f"https://t.me/{chat.username}/{message.id}"
         else:
             return f"https://t.me/c/{chat.id}/{message.id}"
-        
-    async def buildAlertCallText(event: telethon.events.newmessage.NewMessage.Event):
-        message: telethon.tl.patched.Message = event.message
-        callText = re.sub(rf"^/alert@{await get_username()}\s*", "", message.text)
-        link = await getLinkOfMessage(message)
-        sender: telethon.types.User = await message.get_sender()
-        logger.trace("sender: {sender}", sender=sender)
-        output = f"На кухню зовёт "
-        if sender.username and sender.first_name:
-            output += f"{sender.first_name} @{(sender.username)}"
-        elif sender.username:
-            output += f"@{sender.username}"
-        elif sender.first_name:
-            output += sender.first_name
+    
+    def format_timedelta(td):
+        total_seconds = int(td.total_seconds())  # Общее количество секунд
+        sign = '-' if total_seconds < 0 else ''  # Определяем знак
+        total_seconds = abs(total_seconds)  # Берем абсолютную величину для расчета частей
+        days, remainder = divmod(total_seconds, 86400)  # Определяем дни и остаток
+        hours, remainder = divmod(remainder, 3600)  # Определяем часы и остаток
+        minutes, seconds = divmod(remainder, 60)  # Определяем минуты и остаток
+        # Формируем строку в зависимости от наличия дней и часов
+        if days > 0:
+            return f"{sign}{days} days, {hours:02}:{minutes:02}:{seconds:02}"
+        elif hours > 0:
+            return f"{sign}{hours}:{minutes:02}:{seconds:02}"
         else:
-            output += f"аноним с id={sender.id}"
-        output += f" в чате {link}"
-        if callText:
-            output += f": «{callText}»"
-        return output
+            return f"{sign}{minutes}:{seconds:02}"
+    
+    messages = {}
     
     async def alert(event: telethon.events.newmessage.NewMessage.Event):
-        global lastSend
         message: telethon.tl.patched.Message = event.message
-        to_delete = []
-        if message.sender_id == settings.bot_user_id:
-            logger.warning(f"Sender is bot! Skip: {message.text}")
+        if not (await client.get_me()).is_self:
+            logger.debug(f"Sender is not me! Skip: {message.text}")
             return
-        elif not message.text.startswith(f"/alert@{await get_username()}"):
-            logger.debug(f"Только команда «/alert@{await get_username()}» поддерживается из бесед. {event}", event=event)
-        elif not message.text.startswith(f"/alert@{await get_username()} "):
-            logger.warning("Для вызова всех на кухню необходимо написать команду-приглашение, пробел, пригласительный текст. {event}", event=event)
-            to_delete = await send_to_future(
-                message.peer_id,
-                f"❌ Для вызова всех на кухню необходимо написать:\n\n1. Команду-приглашение\n2. Пробел\n3. Пригласительный текст\n\nПример:\n\n`/alert@{await get_username()} Приходите на кухню есть пиццу 🍕 в честь моего Дня Рождения! 🎂🥳🎉`\n\nКоманды-приглашения без пригласительного текста отключены.",
-                reply_to=event.message,
-                link_preview=False
-            )
-        elif lastSend is not None and datetime.now() < lastSend + timedelta(seconds=NEED_TO_WAIT_S):
-            logger.warning("Слишком частые оповещения {event}", event=event)
-            to_delete = await send_to_future(
-                message.peer_id,
-                f"⏳ Слишком частые оповещения, нужно подождать {lastSend + timedelta(seconds=NEED_TO_WAIT_S) - datetime.now()}",
-                reply_to=event.message,
-                link_preview=False
-            )
+        found = searcher_datetime.search(message.message)
+        logger.info(found)
+        if not found:
+            return
+        found = found.groups()[0]
+        parsed = parser.parse(found)
+        n = datetime.now().astimezone()
+        old_str = found
+        new_str = f"{found} (⏳ {format_timedelta(parsed - n)})"
+        while parsed - n > timedelta(minutes=-10):
+            logger.debug("in while...")
+            message = await message.edit(message.message.replace(old_str, new_str, 1))
+            messages[message.id] = message
+            await sleep(5)
+            message: telethon.types.Message = messages[message.id]
+            try:
+                found = searcher_datetime.search(message.message).group(1)
+                parsed = parser.parse(found)
+            except Exception as e:
+                logger.exception(e)
+                break
+            try:
+                old_str = searcher_delta.search(message.message).group(0)
+            except IndexError as e:
+                logger.exception(e)
+                break
+            n = datetime.now().astimezone()
+            new_str = f" ({'⏳' if parsed > n else '⌛️'} {format_timedelta(parsed - n)})"
+            logger.debug("new_str: {}", new_str)
         else:
-            lastSend = datetime.now()
-            sendent = await send_to_future(
-                telethon.types.PeerChannel(settings.target_chat),
-                await buildAlertCallText(event),
-                link_preview=False
-            )
-            if sendent:
-                link = await getLinkOfMessage(sendent[0])
-                await send_to_future(
-                    message.peer_id,
-                    f"✅ Зов создан: {link}",
-                    reply_to=event.message,
-                    link_preview=False
-                )
-        if to_delete:
-            await sleep(60)
-            await client.delete_messages(entity=event.chat_id, message_ids=to_delete)
+            if old_str != found:
+                await message.edit(message.message.replace(old_str, "", 1))
 
     @client.on(events.NewMessage())
-    async def handler(event: telethon.events.newmessage.NewMessage.Event):
+    async def handler_new(event: telethon.events.newmessage.NewMessage.Event):
         try:
             message: telethon.tl.patched.Message = event.message
             logger.info("got message {}: {}", message.peer_id, message.message)
+            messages[message.id] = message
             await alert(event)
         except Exception as e:
             logger.exception(e)
@@ -199,5 +180,13 @@ with TelegramClient(
                 reply_to=event.message,
                 link_preview=False
             )
+        finally:
+            del messages[message.id]
+    
+    @client.on(events.MessageEdited())
+    async def handler_edit(event: telethon.events.messageedited.MessageEdited.Event):
+        if event.message.id in messages:
+            messages[event.message.id] = event.message
+    
     logger.info("Telegram ready")
     client.run_until_disconnected()
