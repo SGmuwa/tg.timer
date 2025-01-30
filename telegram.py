@@ -18,7 +18,7 @@ logger.trace("application started.")
 
 MAX_WAIT_S = int(environ.get("MAX_WAIT_S", "5400"))
 
-searcher_datetime = re.compile(r"\b(?:(?:[iI]\s?think\s?at\s?)|(?:[яЯ]\s?думаю\s?в\s?))(\d{4}-\d{2}-\d{2}(?:T|\s)(?:\d{1,2}):(?:\d{1,2})(?::(?:\d{1,2})(?:\.\d{1,6})?)?(?:\s?[+-]\d{2}:\d{2}|Z))\b")
+searcher_datetime = re.compile(r"\b(?:(?:[iI]\s?think\s?at\s?)|(?:[яЯ]\s?думаю\s?(?:в|к)\s?))(\d{4}-\d{2}-\d{2}(?:T|\s)(?:\d{1,2}):(?:\d{1,2})(?::(?:\d{1,2})(?:\.\d{1,6})?)?(?:\s?[+-]\d{2}:\d{2}|Z))\b")
 searcher_delta = re.compile(r" \((?:⏳|⌛️) \-?(?:\d+ days, )?\d{1,2}(?::\d{1,2}(?::\d{1,2})?)?\)")
 
 need_stop = False
