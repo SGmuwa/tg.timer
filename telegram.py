@@ -143,11 +143,12 @@ with TelegramClient(
         while not need_stop:
             try:
                 try:
-                    msg = queue.popleft()
+                    msg = queue[0]
                 except IndexError:
                     scheduler_is_running = False
                     break
                 msg_new = await consume(msg)
+                queue.popleft()
                 del messages[msg.id]
                 if msg_new:
                     messages[msg_new.id] = msg_new
