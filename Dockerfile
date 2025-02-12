@@ -7,7 +7,6 @@ RUN pyinstaller --hidden-import=tzdata telegram.py
 FROM scratch as merger
 COPY --from=builder ./dist/telegram /app
 COPY --from=builder /lib/libz.so.1 /lib/ld-musl-x86_64.so.1 /lib/
-# COPY --from=builder /usr/local/lib/python3.12/site-packages/tzdata /usr/local/lib/python3.12/site-packages/tzdata
 
 FROM scratch as runner
 ENTRYPOINT [ "/app/telegram" ]
