@@ -20,7 +20,7 @@ logger.trace("application started.")
 MAX_WAIT_S = int(environ.get("MAX_WAIT_S", "5400"))
 PARSE_TIMEZONE_DEFAULT = ZoneInfo(environ.get("PARSE_TIMEZONE_DEFAULT", "UTC"))
 
-searcher_datetime = re.compile(r"\b(?:(?:[iI]\s?think\s?at\s?)|(?:[яЯ]\s?думаю\s?(?:в|к)\s?))((\d{4}-\d{2}-\d{2})?(?:T|\s)?(?:\d{1,2}):(?:\d{1,2})(?::(?:\d{1,2})(?:\.\d{1,6})?)?(\s?[+-]\d{2}:\d{2}|Z)?)\b")
+searcher_datetime = re.compile(r"\b(?:(?:(?:[iI]\s?think\s?)?[Aa]t\s?)|(?:(?:[яЯ]\s?думаю\s?)?[вВкК]\s?))((\d{4}-\d{2}-\d{2})?(?:T|\s)?(?:\d{1,2}):(?:\d{1,2})(?::(?:\d{1,2})(?:\.\d{1,6})?)?(\s?[+-]\d{2}:\d{2}|Z)?)\b")
 searcher_delta = re.compile(r" \((?:⏳|⌛️) \-?(?:\d+ days, )?\d{1,2}(?::\d{1,2}(?::\d{1,2})?)?\)")
 
 need_stop = False
@@ -136,7 +136,7 @@ with TelegramClient(
         else:
             return f"https://t.me/c/{chat.id}/{message.id}"
     
-    def format_timedelta(td):
+    def format_timedelta(td: timedelta) -> str:
         total_seconds = int(td.total_seconds())  # Общее количество секунд
         sign = '-' if total_seconds < 0 else ''  # Определяем знак
         total_seconds = abs(total_seconds)  # Берем абсолютную величину для расчета частей
@@ -163,6 +163,7 @@ with TelegramClient(
         global scheduler_is_running
         scheduler_is_running = True
         global need_stop
+        period_s: float = 1.0
         while not need_stop:
             try:
                 try:
@@ -181,9 +182,15 @@ with TelegramClient(
                     logger.debug("new message to queue from consumer: {}", msg_new)
                     messages[msg_new.id] = msg_new
                     queue.append(msg_new)
+            except telethon.errors.rpcerrorlist.FloodWaitError as e:
+                logger.exception(e)
+                logger.info("sleep for {} s", e.seconds)
+                await sleep(e.seconds)
             except Exception as e:
                 logger.exception(e)
-            await sleep(1)
+            logger.debug("sleep for {} s", period_s)
+            await sleep(period_s)
+            period_s = min(1800.0, period_s+0.01)
     
     async def consume(message: telethon.types.Message) -> telethon.types.Message:
         message: telethon.types.Message = messages[message.id]
@@ -215,7 +222,7 @@ with TelegramClient(
         logger.debug(found)
         if not found:
             return
-        if parsed - n > timedelta(minutes=-10):
+        if parsed - n > timedelta(seconds=-MAX_WAIT_S):
             queue.append(message)
             if not scheduler_is_running:
                 await scheduler()
