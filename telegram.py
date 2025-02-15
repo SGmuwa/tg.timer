@@ -195,6 +195,10 @@ with TelegramClient(
     async def consume(message: telethon.types.Message) -> telethon.types.Message:
         message: telethon.types.Message = messages[message.id]
         found, parsed, n = myParse(message.message, dates.get(message.id))
+        if parsed == None:
+            logger.warning("parsed date not found in consumer. Panic drop message without edit or restore. {}", message)
+            del dates[message.id]
+            return
         try:
             old_str = searcher_delta.search(message.message).group(0)
         except AttributeError:
