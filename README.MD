@@ -1,5 +1,5 @@
-# kt.pizza
-Данный репозиторий содержит бот оповещения о пицце:
+# tg.timer
+Данный код реализует обратный отсчёт времени при отправке даты и/или времени и/или часового пояса.
 
 * `telegram.py`
 
@@ -31,6 +31,7 @@ python3 telegram.py
 | `SCHEDULER_SLEEP_FLOOD_STRATEGY` | `remember per instance`               | `remember per scheduler`, `remember per instance`, `just wait`, `don't wait`, `exit scheduler`, `exit program`       | Как реагировать на ошибку `420` `FLOOD` (`FloodWaitError`). Ошибка обозначает, что Telegram сервер просит подождать заданное количество времени. Подробнее ниже. |
 | `SCHEDULER_SLEEP_MAX_S`          | `1800.0`                              | `SCHEDULER_SLEEP_START_S` <= x < 3155673600.0                                                                        | Максимальное время ожидание. Только `just wait` не обращает внимание на эту переменную |
 | `SEARCHER_DATETIME_REGEX`        | см. код                               | regex с тремя группами: найденная дата со временем и часовым поясом, дата без времени и часового пояса, часовой пояс | Регулярное выражение, по которому программа понимает, что написано в сообщении время |
+| `IS_TRIGGER_AT_EDIT_MESSAGE`     | `true`                                | `true`, `false`                                                                                                      | Надо ли добавлять обратный отсчёт для сообщений, которые отредактированы? |
 
 
 Если вдруг заданы одновременно `TELEGRAM_SECRET_PATH` и `TELEGRAM_SECRET`, то будет использован `TELEGRAM_SECRET`.

@@ -32,6 +32,8 @@ assert SCHEDULER_SLEEP_FLOOD_STRATEGY in ["remember per scheduler", "remember pe
 SCHEDULER_SLEEP_MAX_S = float(environ.get("SCHEDULER_SLEEP_MAX_S", 1800.0))
 assert SCHEDULER_SLEEP_MAX_S >= SCHEDULER_SLEEP_START_S
 assert SCHEDULER_SLEEP_MAX_S < 3155673600.0 # 100 years
+IS_TRIGGER_AT_EDIT_MESSAGE = loads(environ.get("IS_TRIGGER_AT_EDIT_MESSAGE", "true"))
+assert IS_TRIGGER_AT_EDIT_MESSAGE == True or IS_TRIGGER_AT_EDIT_MESSAGE == False
 SEARCHER_DATETIME_REGEX = environ.get("SEARCHER_DATETIME_REGEX", r"\b(?:(?:(?:[iI]\s?think\s?)?[Aa]t\s?)|(?:(?:[яЯ]\s?думаю\s?)?(?:[вВкК]|(?:до)|(?:До))\s?))((\d{4}-\d{2}-\d{2})?(?:T|\s)?(?:\d{1,2}):(?:\d{1,2})(?::(?:\d{1,2})(?:\.\d{1,6})?)?(\s?[+-]\d{2}:\d{2}|Z)?)\b")
 SEARCHER_DELTA_REGEX = environ.get("SEARCHER_DELTA_REGEX", r" \((?:⏳|⌛️) \-?(?:\d+ days, )?\d{1,2}(?::\d{1,2}(?::\d{1,2})?)?\)")
 
@@ -292,6 +294,8 @@ with TelegramClient(
     async def handler_edit(event: telethon.events.messageedited.MessageEdited.Event):
         if event.message.id in messages:
             messages[event.message.id] = event.message
+        elif IS_TRIGGER_AT_EDIT_MESSAGE:
+            return await handler_new(event)
     
     async def handler_signal():
         global need_stop
