@@ -177,9 +177,9 @@ with TelegramClient(
     scheduler_is_running = False
     
     async def scheduler():
-        global scheduler_is_running, SCHEDULER_SLEEP_START_S
+        global need_stop, scheduler_is_running, SCHEDULER_SLEEP_START_S
         scheduler_is_running = True
-        global need_stop
+        logger.info("scheduler is running... period_s = SCHEDULER_SLEEP_START_S = {}, SCHEDULER_SLEEP_FLOOD_STRATEGY = {}, SCHEDULER_SLEEP_ALWAYS_ADD_S = {}, SCHEDULER_SLEEP_MAX_S = {}", SCHEDULER_SLEEP_START_S, SCHEDULER_SLEEP_FLOOD_STRATEGY, SCHEDULER_SLEEP_ALWAYS_ADD_S, SCHEDULER_SLEEP_MAX_S)
         period_s: float = SCHEDULER_SLEEP_START_S
         while not need_stop:
             try:
@@ -200,6 +200,7 @@ with TelegramClient(
                     queue.append(msg_new)
             except telethon.errors.rpcerrorlist.FloodWaitError as e:
                 logger.exception(e)
+                logger.info("current period_s = {}", period_s)
                 if "remember per scheduler" == SCHEDULER_SLEEP_FLOOD_STRATEGY:
                     period_s = max(period_s, e.seconds)
                 elif "remember per instance" == SCHEDULER_SLEEP_FLOOD_STRATEGY:
@@ -218,12 +219,14 @@ with TelegramClient(
                     exit(2)
                 else:
                     raise NotImplementedError("SCHEDULER_SLEEP_FLOOD_STRATEGY", SCHEDULER_SLEEP_FLOOD_STRATEGY)
+                logger.info("new period_s = {}", period_s)
             except Exception as e:
                 logger.exception(e)
             logger.debug("sleep for {} s", period_s)
             await sleep(period_s)
             period_s = min(SCHEDULER_SLEEP_MAX_S, period_s+SCHEDULER_SLEEP_ALWAYS_ADD_S)
         scheduler_is_running = False
+        logger.info("scheduler is stopping... period_s = {}", period_s)
     
     async def consume(message: telethon.types.Message) -> telethon.types.Message:
         message: telethon.types.Message = messages[message.id]
@@ -243,7 +246,12 @@ with TelegramClient(
             return
         new_str = f"{found if old_str == found else ''} ({'⏳' if parsed > n else '⌛️'} {format_timedelta(parsed - n)})"
         logger.debug("new_str: {}", new_str)
-        new_message = await message.edit(message.message.replace(old_str, new_str, 1))
+        try:
+            new_message = await message.edit(message.message.replace(old_str, new_str, 1))
+        except telethon.errors.rpcerrorlist.MessageIdInvalidError as e:
+            logger.exception(e)
+            del dates[message.id]
+            return
         messages[new_message.id] = new_message
         dates[new_message.id] = parsed
         if new_message.id != message.id:
