@@ -254,7 +254,6 @@ with TelegramClient(
             logger.exception(e)
             del dates[message.id]
             return
-        messages[new_message.id] = new_message
         dates[new_message.id] = parsed
         if new_message.id != message.id:
             del dates[message.id]
@@ -262,6 +261,7 @@ with TelegramClient(
     
     async def alert(event: telethon.events.newmessage.NewMessage.Event):
         message: telethon.tl.patched.Message = event.message
+        logger.debug("got message {}: {}", message.peer_id, message.message)
         if not (await client.get_me()).id == message.sender_id:
             logger.debug(f"Sender is not me! Skip: {message.text}")
             return
@@ -270,6 +270,7 @@ with TelegramClient(
         if not found:
             return
         if parsed - n > timedelta(seconds=-MAX_PAST_TIME_S):
+            messages[message.id] = message
             queue.append(message)
             if not scheduler_is_running:
                 await scheduler()
@@ -278,8 +279,6 @@ with TelegramClient(
     async def handler_new(event: telethon.events.newmessage.NewMessage.Event):
         try:
             message: telethon.tl.patched.Message = event.message
-            logger.debug("got message {}: {}", message.peer_id, message.message)
-            messages[message.id] = message
             await alert(event)
         except Exception as e:
             logger.exception(e)
