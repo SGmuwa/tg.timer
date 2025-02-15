@@ -17,11 +17,28 @@ from zoneinfo import ZoneInfo
 
 logger.trace("application started.")
 
-MAX_WAIT_S = int(environ.get("MAX_WAIT_S", "5400"))
+MAX_PAST_TIME_S = int(environ.get("MAX_PAST_TIME_S", "5400"))
+assert MAX_PAST_TIME_S >= 0.0
+assert MAX_PAST_TIME_S < 86400.0 # less than 1 day. For support time without day
 PARSE_TIMEZONE_DEFAULT = ZoneInfo(environ.get("PARSE_TIMEZONE_DEFAULT", "UTC"))
+SCHEDULER_SLEEP_START_S = float(environ.get("SCHEDULER_SLEEP_START_S", 1.0))
+assert SCHEDULER_SLEEP_START_S >= 1.0
+assert SCHEDULER_SLEEP_START_S < 3155673600.0 # 100 years
+SCHEDULER_SLEEP_ALWAYS_ADD_S = float(environ.get("SCHEDULER_SLEEP_ALWAYS_ADD_S", 0.01))
+assert SCHEDULER_SLEEP_ALWAYS_ADD_S >= 0.0
+assert SCHEDULER_SLEEP_ALWAYS_ADD_S < 3155673600.0 # 100 years
+SCHEDULER_SLEEP_FLOOD_STRATEGY = environ.get("SCHEDULER_SLEEP_FLOOD_STRATEGY", "just wait").lower()
+assert SCHEDULER_SLEEP_FLOOD_STRATEGY in ["remember per scheduler", "remember per instance", "just wait", "don't wait", "exit scheduler", "exit program"]
+SCHEDULER_SLEEP_MAX_S = float(environ.get("SCHEDULER_SLEEP_MAX_S", 1800.0))
+assert SCHEDULER_SLEEP_MAX_S >= SCHEDULER_SLEEP_START_S
+assert SCHEDULER_SLEEP_MAX_S < 3155673600.0 # 100 years
+SEARCHER_DATETIME_REGEX = environ.get("SEARCHER_DATETIME_REGEX", r"\b(?:(?:(?:[iI]\s?think\s?)?[Aa]t\s?)|(?:(?:[яЯ]\s?думаю\s?)?[вВкК]\s?))((\d{4}-\d{2}-\d{2})?(?:T|\s)?(?:\d{1,2}):(?:\d{1,2})(?::(?:\d{1,2})(?:\.\d{1,6})?)?(\s?[+-]\d{2}:\d{2}|Z)?)\b")
+SEARCHER_DELTA_REGEX = environ.get("SEARCHER_DELTA_REGEX", r" \((?:⏳|⌛️) \-?(?:\d+ days, )?\d{1,2}(?::\d{1,2}(?::\d{1,2})?)?\)")
 
-searcher_datetime = re.compile(r"\b(?:(?:(?:[iI]\s?think\s?)?[Aa]t\s?)|(?:(?:[яЯ]\s?думаю\s?)?[вВкК]\s?))((\d{4}-\d{2}-\d{2})?(?:T|\s)?(?:\d{1,2}):(?:\d{1,2})(?::(?:\d{1,2})(?:\.\d{1,6})?)?(\s?[+-]\d{2}:\d{2}|Z)?)\b")
-searcher_delta = re.compile(r" \((?:⏳|⌛️) \-?(?:\d+ days, )?\d{1,2}(?::\d{1,2}(?::\d{1,2})?)?\)")
+searcher_datetime = re.compile(SEARCHER_DATETIME_REGEX)
+del SEARCHER_DATETIME_REGEX
+searcher_delta = re.compile(SEARCHER_DELTA_REGEX)
+del SEARCHER_DELTA_REGEX
 
 need_stop = False
 
@@ -38,7 +55,7 @@ def myParse(m: str, old_date: date = None, now: datetime = None) -> tuple[str, d
     del timezone
     if date == None:
         if old_date == None:
-            if (parsed + timedelta(seconds=MAX_WAIT_S)) < now:
+            if (parsed + timedelta(seconds=MAX_PAST_TIME_S)) < now:
                 parsed += timedelta(days=1)
         else:
             parsed = parsed.replace(year=old_date.year, month=old_date.month, day=old_date.day)
@@ -160,16 +177,15 @@ with TelegramClient(
     scheduler_is_running = False
     
     async def scheduler():
-        global scheduler_is_running
+        global scheduler_is_running, SCHEDULER_SLEEP_START_S
         scheduler_is_running = True
         global need_stop
-        period_s: float = 1.0
+        period_s: float = SCHEDULER_SLEEP_START_S
         while not need_stop:
             try:
                 try:
                     msg = queue[0]
                 except IndexError:
-                    scheduler_is_running = False
                     break
                 msg_new = None
                 try:
@@ -184,13 +200,30 @@ with TelegramClient(
                     queue.append(msg_new)
             except telethon.errors.rpcerrorlist.FloodWaitError as e:
                 logger.exception(e)
-                logger.info("sleep for {} s", e.seconds)
-                await sleep(e.seconds)
+                if "remember per scheduler" == SCHEDULER_SLEEP_FLOOD_STRATEGY:
+                    period_s = max(period_s, e.seconds)
+                elif "remember per instance" == SCHEDULER_SLEEP_FLOOD_STRATEGY:
+                    SCHEDULER_SLEEP_START_S = max(SCHEDULER_SLEEP_START_S, e.seconds)
+                    period_s = max(period_s, SCHEDULER_SLEEP_START_S)
+                elif "just wait" == SCHEDULER_SLEEP_FLOOD_STRATEGY:
+                    logger.info("sleep for {} s", e.seconds)
+                    await sleep(e.seconds)
+                    continue
+                elif "don't wait" == SCHEDULER_SLEEP_FLOOD_STRATEGY:
+                    pass
+                elif "exit scheduler" == SCHEDULER_SLEEP_FLOOD_STRATEGY:
+                    dates.clear()
+                    return
+                elif "exit program" == SCHEDULER_SLEEP_FLOOD_STRATEGY:
+                    exit(2)
+                else:
+                    raise NotImplementedError("SCHEDULER_SLEEP_FLOOD_STRATEGY", SCHEDULER_SLEEP_FLOOD_STRATEGY)
             except Exception as e:
                 logger.exception(e)
             logger.debug("sleep for {} s", period_s)
             await sleep(period_s)
-            period_s = min(1800.0, period_s+0.01)
+            period_s = min(SCHEDULER_SLEEP_MAX_S, period_s+SCHEDULER_SLEEP_ALWAYS_ADD_S)
+        scheduler_is_running = False
     
     async def consume(message: telethon.types.Message) -> telethon.types.Message:
         message: telethon.types.Message = messages[message.id]
@@ -203,7 +236,7 @@ with TelegramClient(
             old_str = searcher_delta.search(message.message).group(0)
         except AttributeError:
             old_str = found
-        if parsed - n < timedelta(seconds=-MAX_WAIT_S):
+        if parsed - n < timedelta(seconds=-MAX_PAST_TIME_S):
             if old_str != found:
                 await message.edit(message.message.replace(old_str, "", 1))
             del dates[message.id]
@@ -226,7 +259,7 @@ with TelegramClient(
         logger.debug(found)
         if not found:
             return
-        if parsed - n > timedelta(seconds=-MAX_WAIT_S):
+        if parsed - n > timedelta(seconds=-MAX_PAST_TIME_S):
             queue.append(message)
             if not scheduler_is_running:
                 await scheduler()
