@@ -24,7 +24,7 @@ PARSE_TIMEZONE_DEFAULT = ZoneInfo(environ.get("PARSE_TIMEZONE_DEFAULT", "UTC"))
 SCHEDULER_SLEEP_START_S = float(environ.get("SCHEDULER_SLEEP_START_S", 1.0))
 assert SCHEDULER_SLEEP_START_S >= 1.0
 assert SCHEDULER_SLEEP_START_S < 3155673600.0 # 100 years
-SCHEDULER_SLEEP_ALWAYS_ADD_S = float(environ.get("SCHEDULER_SLEEP_ALWAYS_ADD_S", 0.01))
+SCHEDULER_SLEEP_ALWAYS_ADD_S = float(environ.get("SCHEDULER_SLEEP_ALWAYS_ADD_S", 0.05))
 assert SCHEDULER_SLEEP_ALWAYS_ADD_S >= 0.0
 assert SCHEDULER_SLEEP_ALWAYS_ADD_S < 3155673600.0 # 100 years
 SCHEDULER_SLEEP_FLOOD_STRATEGY = environ.get("SCHEDULER_SLEEP_FLOOD_STRATEGY", "just wait").lower()
@@ -32,6 +32,8 @@ assert SCHEDULER_SLEEP_FLOOD_STRATEGY in ["remember per scheduler", "remember pe
 SCHEDULER_SLEEP_MAX_S = float(environ.get("SCHEDULER_SLEEP_MAX_S", 1800.0))
 assert SCHEDULER_SLEEP_MAX_S >= SCHEDULER_SLEEP_START_S
 assert SCHEDULER_SLEEP_MAX_S < 3155673600.0 # 100 years
+SCHEDULER_TELEGRAM_SERVER_CAN_OVERRIDE_MAX_S_STRATEGY = environ.get("SCHEDULER_TELEGRAM_SERVER_CAN_OVERRIDE_MAX_S_STRATEGY", "remember per instance")
+assert SCHEDULER_TELEGRAM_SERVER_CAN_OVERRIDE_MAX_S_STRATEGY in ["remember per scheduler", "remember per instance", "don't override"]
 IS_TRIGGER_AT_EDIT_MESSAGE = loads(environ.get("IS_TRIGGER_AT_EDIT_MESSAGE", "true"))
 assert IS_TRIGGER_AT_EDIT_MESSAGE == True or IS_TRIGGER_AT_EDIT_MESSAGE == False
 SEARCHER_DATETIME_REGEX = environ.get("SEARCHER_DATETIME_REGEX", r"\b(?:(?:(?:[iI]\s?think\s?)?[Aa]t\s?)|(?:(?:[яЯ]\s?думаю\s?)?(?:[вВкК]|(?:до)|(?:До))\s?))((\d{4}-\d{2}-\d{2})?(?:T|\s)?(?:\d{1,2}):(?:\d{1,2})(?::(?:\d{1,2})(?:\.\d{1,6})?)?(\s?[+-]\d{2}:\d{2}|Z)?)\b")
@@ -179,10 +181,11 @@ with TelegramClient(
     scheduler_is_running = False
     
     async def scheduler():
-        global need_stop, scheduler_is_running, SCHEDULER_SLEEP_START_S
+        global need_stop, scheduler_is_running, SCHEDULER_SLEEP_START_S, SCHEDULER_SLEEP_MAX_S
         scheduler_is_running = True
         logger.info("scheduler is running... period_s = SCHEDULER_SLEEP_START_S = {}, SCHEDULER_SLEEP_FLOOD_STRATEGY = {}, SCHEDULER_SLEEP_ALWAYS_ADD_S = {}, SCHEDULER_SLEEP_MAX_S = {}", SCHEDULER_SLEEP_START_S, SCHEDULER_SLEEP_FLOOD_STRATEGY, SCHEDULER_SLEEP_ALWAYS_ADD_S, SCHEDULER_SLEEP_MAX_S)
         period_s: float = SCHEDULER_SLEEP_START_S
+        sleep_max_s: float = SCHEDULER_SLEEP_MAX_S
         while not need_stop:
             try:
                 try:
@@ -202,14 +205,22 @@ with TelegramClient(
                     queue.append(msg_new)
             except telethon.errors.rpcerrorlist.FloodWaitError as e:
                 logger.exception(e)
-                logger.info("current period_s = {}", period_s)
+                logger.info("current period_s = {}, sleep_max_s = {}, SCHEDULER_SLEEP_MAX_S = {}", period_s, sleep_max_s, SCHEDULER_SLEEP_MAX_S)
+                if "remember per scheduler" == SCHEDULER_TELEGRAM_SERVER_CAN_OVERRIDE_MAX_S_STRATEGY:
+                    sleep_max_s = max(sleep_max_s, e.seconds)
+                elif "remember per instance" == SCHEDULER_TELEGRAM_SERVER_CAN_OVERRIDE_MAX_S_STRATEGY:
+                    SCHEDULER_SLEEP_MAX_S = sleep_max_s = max(SCHEDULER_SLEEP_MAX_S, sleep_max_s, e.seconds)
+                elif "don't override" == SCHEDULER_TELEGRAM_SERVER_CAN_OVERRIDE_MAX_S_STRATEGY:
+                    pass
+                else:
+                    raise NotImplementedError("SCHEDULER_TELEGRAM_SERVER_CAN_OVERRIDE_MAX_S_STRATEGY", SCHEDULER_TELEGRAM_SERVER_CAN_OVERRIDE_MAX_S_STRATEGY)
                 if "remember per scheduler" == SCHEDULER_SLEEP_FLOOD_STRATEGY:
                     period_s = max(period_s, e.seconds)
                 elif "remember per instance" == SCHEDULER_SLEEP_FLOOD_STRATEGY:
                     SCHEDULER_SLEEP_START_S = max(SCHEDULER_SLEEP_START_S, e.seconds)
                     period_s = max(period_s, SCHEDULER_SLEEP_START_S)
                 elif "just wait" == SCHEDULER_SLEEP_FLOOD_STRATEGY:
-                    logger.info("sleep for {} s", e.seconds)
+                    logger.info("just sleep for {} s", e.seconds)
                     await sleep(e.seconds)
                     continue
                 elif "don't wait" == SCHEDULER_SLEEP_FLOOD_STRATEGY:
@@ -221,12 +232,12 @@ with TelegramClient(
                     exit(2)
                 else:
                     raise NotImplementedError("SCHEDULER_SLEEP_FLOOD_STRATEGY", SCHEDULER_SLEEP_FLOOD_STRATEGY)
-                logger.info("new period_s = {}", period_s)
+                logger.info("new period_s = {}, sleep_max_s = {}, SCHEDULER_SLEEP_MAX_S = {}", period_s, sleep_max_s, SCHEDULER_SLEEP_MAX_S)
             except Exception as e:
                 logger.exception(e)
             logger.debug("sleep for {} s", period_s)
             await sleep(period_s)
-            period_s = min(SCHEDULER_SLEEP_MAX_S, period_s+SCHEDULER_SLEEP_ALWAYS_ADD_S)
+            period_s = min(sleep_max_s, period_s+SCHEDULER_SLEEP_ALWAYS_ADD_S)
         scheduler_is_running = False
         logger.info("scheduler is stopping... period_s = {}", period_s)
     
