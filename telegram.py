@@ -274,7 +274,10 @@ with TelegramClient(
         message: telethon.tl.patched.Message = event.message
         logger.debug("got message {}: {}", message.peer_id, message.message)
         if not (await client.get_me()).id == message.sender_id:
-            logger.debug(f"Sender is not me! Skip: {message.text}")
+            logger.debug("Sender is not me! Skip: %s", message.text)
+            return
+        if not message or not message.message:
+            logger.debug("message is empty: %s", message)
             return
         found, parsed, n = myParse(message.message)
         logger.debug(found)
