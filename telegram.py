@@ -17,25 +17,30 @@ from zoneinfo import ZoneInfo
 
 logger.trace("application started.")
 
+def my_assert(f: str):
+    e = eval(f)
+    if not e:
+        raise AssertionError({"fun":f, "result":e})
+
 MAX_PAST_TIME_S = int(environ.get("MAX_PAST_TIME_S", "5400"))
-assert MAX_PAST_TIME_S >= 0.0
-assert MAX_PAST_TIME_S < 86400.0 # less than 1 day. For support time without day
+my_assert("MAX_PAST_TIME_S >= 0.0")
+my_assert("MAX_PAST_TIME_S < 86400.0") # less than 1 day. For support time without day
 PARSE_TIMEZONE_DEFAULT = ZoneInfo(environ.get("PARSE_TIMEZONE_DEFAULT", "UTC"))
 SCHEDULER_SLEEP_START_S = float(environ.get("SCHEDULER_SLEEP_START_S", 1.0))
-assert SCHEDULER_SLEEP_START_S >= 1.0
-assert SCHEDULER_SLEEP_START_S < 3155673600.0 # 100 years
+my_assert("SCHEDULER_SLEEP_START_S >= 1.0")
+my_assert("SCHEDULER_SLEEP_START_S < 3155673600.0") # 100 years
 SCHEDULER_SLEEP_ALWAYS_ADD_S = float(environ.get("SCHEDULER_SLEEP_ALWAYS_ADD_S", 0.05))
-assert SCHEDULER_SLEEP_ALWAYS_ADD_S >= 0.0
-assert SCHEDULER_SLEEP_ALWAYS_ADD_S < 3155673600.0 # 100 years
+my_assert("SCHEDULER_SLEEP_ALWAYS_ADD_S >= 0.0")
+my_assert("SCHEDULER_SLEEP_ALWAYS_ADD_S < 3155673600.0") # 100 years
 SCHEDULER_SLEEP_FLOOD_STRATEGY = environ.get("SCHEDULER_SLEEP_FLOOD_STRATEGY", "just wait").lower()
-assert SCHEDULER_SLEEP_FLOOD_STRATEGY in ["remember per scheduler", "remember per instance", "just wait", "don't wait", "exit scheduler", "exit program"]
+my_assert("""SCHEDULER_SLEEP_FLOOD_STRATEGY in ["remember per scheduler", "remember per instance", "just wait", "don't wait", "exit scheduler", "exit program"]""")
 SCHEDULER_SLEEP_MAX_S = float(environ.get("SCHEDULER_SLEEP_MAX_S", 1800.0))
-assert SCHEDULER_SLEEP_MAX_S >= SCHEDULER_SLEEP_START_S
-assert SCHEDULER_SLEEP_MAX_S < 3155673600.0 # 100 years
+my_assert("SCHEDULER_SLEEP_MAX_S >= SCHEDULER_SLEEP_START_S")
+my_assert("SCHEDULER_SLEEP_MAX_S < 3155673600.0") # 100 years
 SCHEDULER_TELEGRAM_SERVER_CAN_OVERRIDE_MAX_S_STRATEGY = environ.get("SCHEDULER_TELEGRAM_SERVER_CAN_OVERRIDE_MAX_S_STRATEGY", "remember per instance")
-assert SCHEDULER_TELEGRAM_SERVER_CAN_OVERRIDE_MAX_S_STRATEGY in ["remember per scheduler", "remember per instance", "don't override"]
+my_assert("""SCHEDULER_TELEGRAM_SERVER_CAN_OVERRIDE_MAX_S_STRATEGY in ["remember per scheduler", "remember per instance", "don't override"]""")
 IS_TRIGGER_AT_EDIT_MESSAGE = loads(environ.get("IS_TRIGGER_AT_EDIT_MESSAGE", "true"))
-assert IS_TRIGGER_AT_EDIT_MESSAGE == True or IS_TRIGGER_AT_EDIT_MESSAGE == False
+my_assert("IS_TRIGGER_AT_EDIT_MESSAGE == True or IS_TRIGGER_AT_EDIT_MESSAGE == False")
 SEARCHER_DATETIME_REGEX = environ.get("SEARCHER_DATETIME_REGEX", r"\b(?:(?:(?:[iI]\s?think\s?)?[Aa]t\s?)|(?:(?:[яЯ]\s?думаю\s?)?(?:[вВкК]|(?:до)|(?:До))\s?))((\d{4}-\d{2}-\d{2})?(?:T|\s)?(?:\d{1,2}):(?:\d{1,2})(?::(?:\d{1,2})(?:\.\d{1,6})?)?(\s?[+-]\d{2}:\d{2}|Z)?)\b")
 SEARCHER_DELTA_REGEX = environ.get("SEARCHER_DELTA_REGEX", r" \((?:⏳|⌛️) \-?(?:\d+ days, )?\d{1,2}(?::\d{1,2}(?::\d{1,2})?)?\)")
 
