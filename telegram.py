@@ -203,7 +203,7 @@ with TelegramClient(
                 except telethon.errors.rpcerrorlist.MessageNotModifiedError as e:
                     logger.exception(e)
                 queue.popleft()
-                del messages[msg.id]
+                messages.pop(msg.id, None)
                 if msg_new:
                     logger.debug("new message to queue from consumer: {}", msg_new)
                     messages[msg_new.id] = msg_new
@@ -251,7 +251,7 @@ with TelegramClient(
         found, parsed, n = myParse(message.message, dates.get(message.id))
         if parsed == None:
             logger.warning("parsed date not found in consumer. Panic drop message without edit or restore. {}", message)
-            del dates[message.id]
+            dates.pop(message.id, None)
             return
         try:
             old_str = searcher_delta.search(message.message).group(0)
@@ -260,7 +260,7 @@ with TelegramClient(
         if parsed - n < timedelta(seconds=-MAX_PAST_TIME_S):
             if old_str != found:
                 await message.edit(message.message.replace(old_str, "", 1))
-            del dates[message.id]
+            dates.pop(message.id, None)
             return
         new_str = f"{found if old_str == found else ''} ({'⏳' if parsed > n else '⌛️'} {format_timedelta(parsed - n)})"
         logger.debug("new_str: {}", new_str)
@@ -268,11 +268,11 @@ with TelegramClient(
             new_message = await message.edit(message.message.replace(old_str, new_str, 1))
         except telethon.errors.rpcerrorlist.MessageIdInvalidError as e:
             logger.exception(e)
-            del dates[message.id]
+            dates.pop(message.id, None)
             return
         dates[new_message.id] = parsed
         if new_message.id != message.id:
-            del dates[message.id]
+            dates.pop(message.id, None)
         return new_message
     
     async def alert(event: telethon.events.newmessage.NewMessage.Event):
